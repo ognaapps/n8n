@@ -1,0 +1,86 @@
+volumes:
+  n8n_storage:
+  redis_storage:
+  postgres_data:
+    driver: local
+
+networks:
+  ogna:
+    external: true
+
+x-shared: &shared
+  restart: always
+  image: docker.n8n.io/n8nio/n8n
+  environment:
+    - DB_TYPE=postgresdb
+    - DB_POSTGRESDB_HOST=database
+    - DB_POSTGRESDB_PORT=5432
+    - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
+    - DB_POSTGRESDB_USER=${POSTGRES_USER}
+    - DB_POSTGRESDB_PASSWORD=${POSTGRES_PASSWORD}
+    - EXECUTIONS_MODE=queue
+    - QUEUE_BULL_REDIS_HOST=redis
+    - QUEUE_HEALTH_CHECK_ACTIVE=true
+    - N8N_ENCRYPTION_KEY=${ENCRYPTION_KEY}
+    - N8N_PROXY_HOPS=1
+  links:
+    - database
+    - redis
+  volumes:
+    - n8n_storage:/home/node/.n8n
+  depends_on:
+    redis:
+      condition: service_healthy
+    database:
+      condition: service_healthy
+  env_file:
+    - .env
+  networks:
+    - ogna
+
+services:
+  database:
+    image: postgres:15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    expose:
+      - "5432"
+    networks:
+      - ogna
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-n8n_db_user} -d ${POSTGRES_DB:-n8n_db}",
+        ]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+    env_file:
+      - .env
+
+  redis:
+    image: redis:6-alpine
+    restart: always
+    volumes:
+      - redis_storage:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - ogna
+
+  n8n:
+    <<: *shared
+    expose:
+      - "5678"
+
+  n8n-worker:
+    <<: *shared
+    command: worker
+    depends_on:
+      - n8n
