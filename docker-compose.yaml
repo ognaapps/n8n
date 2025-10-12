@@ -5,6 +5,7 @@ volumes:
     driver: local
 
 networks:
+  n8n_net:
   ogna:
     external: true
 
@@ -13,7 +14,7 @@ x-shared: &shared
   image: docker.n8n.io/n8nio/n8n
   environment:
     - DB_TYPE=postgresdb
-    - DB_POSTGRESDB_HOST=database
+    - DB_POSTGRESDB_HOST=n8n_db
     - DB_POSTGRESDB_PORT=5432
     - DB_POSTGRESDB_DATABASE=${POSTGRES_DB}
     - DB_POSTGRESDB_USER=${POSTGRES_USER}
@@ -24,22 +25,24 @@ x-shared: &shared
     - N8N_ENCRYPTION_KEY=${ENCRYPTION_KEY}
     - N8N_PROXY_HOPS=1
   links:
-    - database
+    - n8n_db
     - redis
   volumes:
     - n8n_storage:/home/node/.n8n
   depends_on:
     redis:
       condition: service_healthy
-    database:
+    n8n_db:
       condition: service_healthy
   env_file:
     - .env
   networks:
+    - n8n_net
     - ogna
 
 services:
-  database:
+  n8n_db:
+    hostname: n8n_db
     image: postgres:15
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -72,7 +75,7 @@ services:
       timeout: 5s
       retries: 10
     networks:
-      - ogna
+      - n8n_net
 
   n8n:
     <<: *shared
