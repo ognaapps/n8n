@@ -45,27 +45,25 @@ class ComposeApp:
         self.protocol = protocol
         self.env_variables = {
             'POSTGRES_USER': "n8n_postgres_users",
-            'POSTGRES_PASSWORD': lambda x: f"{x}={generate_clear_password()}",
+            'POSTGRES_PASSWORD': generate_clear_password(),
             'POSTGRES_DB': "postgres",
             'POSTGRES_NON_ROOT_USER': "n8n_db_user",
-            'POSTGRES_NON_ROOT_PASSWORD': lambda x: f"{x}={generate_clear_password()}",
-            'ENCRYPTION_KEY': lambda x: f"{x}={generate_clear_password()}",
+            'POSTGRES_NON_ROOT_PASSWORD': generate_clear_password(),
+            'ENCRYPTION_KEY': generate_clear_password(),
             'WEBHOOK_URL': f"{self.protocol}://{PROJECT_NAME}.{self.user}.{self.host}",
-            'N8N_HOST': f"{self.protocol}://{PROJECT_NAME}.{self.user}.{self.host}",
+            'N8N_HOST': f"{PROJECT_NAME}.{self.user}.{self.host}",
             'N8N_PORT': 5678,
             'N8N_PROTOCOL': "http",
-            'N8N_SECURE_COOKIE': False
+            'N8N_SECURE_COOKIE': 'false',
+            'OGNA_USER':user,
+            'OGNA_HOST':host,
+            'OGNA_PROTOCOL':protocol
         }
 
     def configure(self):
         with open('.env', 'w+') as env_file:
             for key, value in self.env_variables.items():
-                if callable(value):  # check if it's a function/lambda
-                    result = value(key)
-                else:
-                    result = f"{key}={value}"
-
-                env_file.write(result)
+                env_file.write(f"{key}={value}")
                 env_file.write("\n")
 
     def deploy(self):
