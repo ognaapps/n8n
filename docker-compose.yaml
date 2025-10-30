@@ -1,12 +1,23 @@
 volumes:
   n8n_storage:
   redis_storage:
+    driver: local
+    driver_opts:
+      type: none
+      device: /mnt/volume-db/n8n/redis
+      o: bind
   postgres_data:
     driver: local
+    driver_opts:
+      type: none
+      device: /mnt/volume-db/n8n/postgress
+      o: bind
 
 networks:
   n8n_net:
   ogna:
+    external: true
+  databases:
     external: true
 
 x-shared: &shared
@@ -39,6 +50,7 @@ x-shared: &shared
   networks:
     - n8n_net
     - ogna
+    - databases
 
 services:
   n8n_db:
