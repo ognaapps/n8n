@@ -28,6 +28,9 @@ def parse_args(argv):
 
 def up():
     """Start docker compose services"""
+
+    subprocess.run(["mkdir", "-p", f"/mnt/volume-db/{PROJECT_NAME}/redis"], check=True)
+    subprocess.run(["mkdir", "-p", f"/mnt/volume-db/{PROJECT_NAME}/postgress"], check=True)
     subprocess.run(["docker", "compose", "-p", PROJECT_NAME, "up", "-d"], check=True)
 
 
