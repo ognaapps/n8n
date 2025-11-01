@@ -7,6 +7,7 @@ import os
 import json
 
 PROJECT_NAME = "n8n"
+VOLUMES = ['redis','postgress']
 
 
 def generate_clear_password(length=100):
@@ -30,12 +31,12 @@ def parse_args(argv):
 
 def up():
     """Start docker compose services"""
-
-    subprocess.run(["mkdir", "-p", f"/mnt/volume-db/{PROJECT_NAME}/redis"], check=True)
-    subprocess.run(["mkdir", "-p", f"/mnt/volume-db/{PROJECT_NAME}/postgress"], check=True)
+    for vol in VOLUMES:
+        subprocess.run(["mkdir", "-p", f"/mnt/volume-db/{PROJECT_NAME}/{vol}"], check=True)
     subprocess.run(["docker", "compose", "-p", PROJECT_NAME, "up", "-d"], check=True)
 
 def restart():
+    """Docker restarts"""
     subprocess.run(["docker", "compose", "-p", PROJECT_NAME, "up", "-d","--force-recreate"], check=True)
 
 def down():
@@ -55,6 +56,32 @@ def get_smtp_secrets():
             raise ValueError(f"Invalid JSON format in {path}: {e}")
 
 
+def load_env_file(path):
+    """
+    Reads a .env file and returns its contents as a dictionary.
+    Lines starting with # are ignored.
+    """
+    env_vars = {}
+
+    try:
+        with open(path, "r") as f:
+            for line in f:
+                line = line.strip()
+
+                # Skip comments or empty lines
+                if not line or line.startswith("#"):
+                    continue
+
+                # Split only on the first '='
+                if "=" in line:
+                    key, value = line.split("=", 1)
+                    env_vars[key.strip()] = value.strip().strip('"').strip("'")
+    except FileNotFoundError:
+        return {}
+
+    return env_vars
+
+
 class ComposeApp:
 
     def __init__(self, action, user, host, protocol):
@@ -62,7 +89,9 @@ class ComposeApp:
         self.user = user
         self.host = host
         self.protocol = protocol
-        
+        self.smtp_data = {}
+        existing_vars =load_env_file('.env')
+
         try:
             self.smtp_data = get_smtp_secrets()
         except Exception as e:
@@ -90,8 +119,11 @@ class ComposeApp:
             'N8N_SMTP_USER':self.smtp_data['user'],
             'N8N_SMTP_PASS':self.smtp_data['password'],
             'N8N_SMTP_SENDER':self.smtp_data['sender'],
-            'N8N_SMTP_SSL':True if str(self.smtp_data['ssl']).lower() in [1,'true',True] else False
+            'N8N_SMTP_SSL':"true" if str(self.smtp_data['ssl']).lower() in [1,'true',True] else "false"
         }
+
+        for key, value in self.env_variables.items():
+            self.env_variables[key] = existing_vars.get(key,value)
 
     def configure(self):
         with open('.env', 'w+') as env_file:
@@ -100,8 +132,6 @@ class ComposeApp:
                 env_file.write("\n")
 
     def deploy(self):
-
-
         self.configure()
         if self.action == "up":
             up()
