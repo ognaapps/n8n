@@ -55,6 +55,17 @@ def get_smtp_secrets():
         except json.JSONDecodeError as e:
             raise ValueError(f"Invalid JSON format in {path}: {e}")
 
+def get_user_data():
+    path = "/mnt/volume-db/secrets/user.json"
+    
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"user config file not found at: {path}")
+    
+    with open(path, "r") as f:
+        try:
+            return json.load(f)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Invalid JSON format in {path}: {e}")
 
 def load_env_file(path):
     """
@@ -121,7 +132,6 @@ class ComposeApp:
             'N8N_SMTP_SENDER':self.smtp_data['sender'],
             'N8N_SMTP_SSL':"true" if str(self.smtp_data['ssl']).lower() in [1,'true',True] else "false"
         }
-
         for key, value in self.env_variables.items():
             self.env_variables[key] = existing_vars.get(key,value)
 
@@ -141,18 +151,20 @@ class ComposeApp:
             restart()            
         else:
             print(f"Unknown command: {self.action}")
-            print("Available commands: up, down")
+            print("Available commands: up, down, restart")
             sys.exit(1)
 
 
 if __name__ == "__main__":
     args = parse_args(sys.argv[1:])
 
+    user_data= get_user_data()
+
     app = ComposeApp(
         action=args.get("action"),
-        user=args.get("user", 'user'),
-        host=args.get("host", 'localhost'),
-        protocol=args.get("protocol", 'http')
+        user=user_data.get('user',args.get("user", 'user')),
+        host=user_data.get('host',args.get("host", 'host')),
+        protocol=user_data.get('protocol',args.get("protocol", 'protocol'))
     )
 
     app.deploy()
